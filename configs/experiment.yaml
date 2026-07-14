@@ -1,0 +1,29 @@
+# Fixed user questions (never altered) and the trigger->replacement pairs swapped
+# inside the assistant's own answer. Each (prompt, pair) is one trial.
+
+prompts:
+  - id: capital_france
+    query: "what is the capital of France?"
+  - id: water_boils
+    query: "at what temperature does water boil?"
+  - id: photosynthesis
+    query: "in one sentence, what is photosynthesis?"
+
+# Whenever the assistant emits `trigger` (whole-word, case-insensitive), replace it
+# with `replacement` and let it keep generating. Add more pairs to run more conditions.
+pairs:
+  - trigger: "the"
+    replacement: "umbrella"
+
+system_prompt: ""        # optional; left empty so models behave naturally
+
+max_new_tokens: 256      # assistant decode budget (greedy / temperature 0)
+top_logprobs: 20         # top-k kept per step; used for the entropy estimate
+post_window: 8           # tokens after each swap to average for the noticing signal
+
+judge:
+  model: google/gemma-4-26B-A4B-it
+  quantization: fp8       # ~25 GB; fits the A6000 alone in phase 2
+  max_model_len: 4096
+  temperature: 0.0
+  max_tokens: 512

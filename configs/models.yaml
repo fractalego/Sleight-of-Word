@@ -1,0 +1,38 @@
+# Target model zoo, smallest -> largest, all chosen to fit a single 48 GB A6000.
+# Rule of thumb at bf16: ~2 GB per 1B params, so <= ~22B fits natively with KV cache;
+# above that, use a 4-bit (awq/gptq) checkpoint. The 72B-awq entry is tight -- keep
+# max_model_len modest. Comment out what you don't want; run a subset with --only.
+models:
+  - name: qwen2.5-0.5b
+    model: Qwen/Qwen2.5-0.5B-Instruct
+    max_model_len: 4096
+
+  - name: qwen2.5-3b
+    model: Qwen/Qwen2.5-3B-Instruct
+    max_model_len: 4096
+
+  - name: llama3.1-8b
+    model: meta-llama/Llama-3.1-8B-Instruct
+    max_model_len: 4096
+
+  - name: qwen2.5-14b
+    model: Qwen/Qwen2.5-14B-Instruct
+    max_model_len: 4096
+
+  # Gemma 4 has no 14B; 12B-it is the nearest (dense, ~24 GB bf16, fits natively).
+  - name: gemma4-12b
+    model: google/gemma-4-12B-it
+    max_model_len: 4096
+
+  # 32B native bf16 is ~64 GB -> use a 4-bit checkpoint.
+  - name: qwen2.5-32b-awq
+    model: Qwen/Qwen2.5-32B-Instruct-AWQ
+    quantization: awq
+    max_model_len: 4096
+
+  # 72B 4-bit ~40 GB: fits but tight. Lower gpu_memory_utilization headroom if OOM.
+  - name: qwen2.5-72b-awq
+    model: Qwen/Qwen2.5-72B-Instruct-AWQ
+    quantization: awq
+    max_model_len: 2048
+    gpu_memory_utilization: 0.95

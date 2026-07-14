@@ -1,0 +1,26 @@
+[project]
+name = "sleight-of-word"
+version = "0.1.0"
+description = "Sleight of Word: a benchmark measuring whether LLMs notice a covertly substituted word in their own output, via downstream token surprisal plus a jury of LLM judges."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "vllm>=0.6.0",
+    "transformers>=4.45",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "rich>=13.7",
+    "pandas>=2.2",
+    "bitsandbytes>=0.49.2",
+]
+
+[project.scripts]
+awareness = "awareness.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/awareness"]

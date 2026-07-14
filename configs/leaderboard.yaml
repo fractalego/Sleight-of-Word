@@ -1,0 +1,116 @@
+# Curated set of strong open models that fit in 4-bit on a single 48 GB A6000.
+# (The HF Open LLM Leaderboard was retired Mar 2025; the actual 2026 frontier open
+# models are 100B-671B MoEs that don't fit, so this is a feasible 4-bit-on-48GB set.)
+#
+# AWQ (awq_marlin kernel) where a checkpoint exists (fastest in vLLM); bitsandbytes
+# on-the-fly 4-bit otherwise; fp8 for the MoE. 70B-class get a smaller max_model_len.
+#
+# ORDER = reliability-first: proven AWQ/fp8 + small/mid bnb up top so their data is
+# banked before the two big bnb models (deepseek-32b, yi-34b) that are OOM-prone on
+# load. llama3.3-70b-awq is commented out — it got SIGKILLed mid-load (2026-07-01);
+# re-enable once we understand why.
+models:
+  - name: qwen2.5-72b-awq            # already complete in results/runs/sweep (auto-skipped)
+    model: Qwen/Qwen2.5-72B-Instruct-AWQ
+    quantization: awq_marlin
+    max_model_len: 2048
+    gpu_memory_utilization: 0.96
+
+  - name: qwen2.5-32b-awq
+    model: Qwen/Qwen2.5-32B-Instruct-AWQ
+    quantization: awq_marlin
+    max_model_len: 4096
+
+  - name: gemma4-26b-a4b             # fp8 MoE (also the judge model) — proven loader
+    model: google/gemma-4-26B-A4B-it
+    quantization: fp8
+    max_model_len: 4096
+
+  - name: qwen2.5-14b
+    model: Qwen/Qwen2.5-14B-Instruct
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: phi-4
+    model: microsoft/phi-4
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: deepseek-r1-distill-7b
+    model: deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  # --- Gemma 4 family (instruction-tuned, Apache 2.0, ungated) ---
+  - name: gemma4-e2b
+    model: google/gemma-4-E2B-it
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: gemma4-e4b
+    model: google/gemma-4-E4B-it
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: gemma4-12b
+    model: google/gemma-4-12B-it
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: gemma4-31b                 # re-added: dropped earlier on a mistaken "too big"
+    model: google/gemma-4-31B-it     # assumption; it fits 4-bit on 48 GB like the rest
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: mistral-small-24b
+    model: mistralai/Mistral-Small-24B-Instruct-2501
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: gemma3-27b
+    model: google/gemma-3-27b-it          # gated=manual; needs token license acceptance
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  # --- big bnb models, OOM-prone on load: run LAST so everything else is banked first ---
+  - name: deepseek-r1-distill-32b
+    model: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: yi-1.5-34b                 # needed RAM headroom to load (bnb 64 GiB ckpt)
+    model: 01-ai/Yi-1.5-34B-Chat
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: llama3.3-70b-awq           # re-enabled 2026-07-03: the 2026-07-01 SIGKILL was a
+    model: casperhansen/llama-3.3-70b-instruct-awq   # full disk, not the model; disk freed
+    quantization: awq_marlin
+    max_model_len: 2048
+    gpu_memory_utilization: 0.96
+
+  # --- phase-3 additions (2026-07-07, checkpoints verified ungated on HF) ---
+  # Rationale: modernize the ladder (Qwen3.6) + attack the thinking confound with a
+  # matched reasoning pair (Magistral vs Mistral-Small-24B; Qwen3 hybrid toggle) + a new
+  # lab lineage at a faithful native quant (gpt-oss).
+  - name: gpt-oss-20b                # OpenAI open-weights MoE; NATIVE MXFP4 (no bnb
+    model: openai/gpt-oss-20b        # lobotomy) — quantization left unset for auto-detect
+    max_model_len: 4096
+
+  - name: magistral-small-24b        # reasoning twin of mistral-small-24b (same family,
+    model: mistralai/Magistral-Small-2509   # same size) -> matched thinking-vs-not pair
+    quantization: bitsandbytes
+    max_model_len: 4096
+    extra:                           # 2509 is multimodal (Pixtral tower); its image
+      limit_mm_per_prompt:           # processor crashes at vLLM profiling. We only need
+        image: 0                     # text -> disable the modality entirely.
+
+  - name: qwen3.6-27b                # newest Qwen mid-size dense (2026)
+    model: Qwen/Qwen3.6-27B
+    quantization: bitsandbytes
+    max_model_len: 4096
+
+  - name: qwen3-32b-awq              # hybrid thinking model (/think vs /no_think toggle
+    model: Qwen/Qwen3-32B-AWQ        # = TODO #3 within one checkpoint); AWQ = fast path
+    quantization: awq_marlin
+    max_model_len: 4096
