@@ -7,6 +7,9 @@ We call the technique **"sleight of word"**, covertly swapping a word in the mod
 output. The framing nods to the *Mandela effect* (false memory of one's own past). We cite
 it as inspiration in the write-up, not as the technique's name.
 
+**Leaderboard:** browse the results for every model — all trials, with their judge
+labels — at <https://fractalego.github.io/Sleight-of-Word/>.
+
 ## The idea
 
 The user asks a fixed question, e.g. `what is the capital of France?`, **never altered.**
