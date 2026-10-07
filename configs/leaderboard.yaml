@@ -114,3 +114,26 @@ models:
     model: Qwen/Qwen3-32B-AWQ        # = TODO #3 within one checkpoint); AWQ = fast path
     quantization: awq_marlin
     max_model_len: 4096
+
+  # --- phase-4 leaderboard update (2026-10-05) — needs vLLM >= 0.28, run from the
+  # separate .venv-vllm031 env (vLLM 0.31.0); the published 19 stay on 0.23 (.venv).
+  # All three are official/RedHat FP8 checkpoints (compressed-tensors, auto-detected;
+  # weight-only FP8 Marlin on Ampere). Multimodal towers disabled: text-only benchmark.
+  - name: qwen3.8-27b                # successor of qwen3.6-27b (Aug 2026); thinking on
+    model: Qwen/Qwen3.8-27B-FP8      # by default. NB: qwen3.6-27b is a juror (same family)
+    max_model_len: 4096
+    extra:
+      limit_mm_per_prompt: {image: 0, video: 0}
+
+  - name: muse-glimmer-30b           # Meta Superintelligence Labs (Aug 2026), new lineage;
+    model: RedHatAI/Muse-Glimmer-30B-FP8-block   # reasoning effort set only via system
+    max_model_len: 4096              # prompt -> default effort under our standard template
+    extra:
+      limit_mm_per_prompt: {image: 0}
+
+  - name: nemotron3.5-lightning-30b  # NVIDIA hybrid Mamba-2/Transformer MoE (30B-A3B),
+    model: RedHatAI/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-FP8   # first non-pure-transformer
+    max_model_len: 4096              # on the board; thinking on by default
+    trust_remote_code: true
+    extra:
+      mamba_ssm_cache_dtype: float16

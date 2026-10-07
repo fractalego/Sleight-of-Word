@@ -26,7 +26,9 @@ DISP = {
 }
 THINKING = {"deepseek-r1-distill-32b", "deepseek-r1-distill-7b", "qwen3-32b-awq",
             "gpt-oss-20b", "gemma4-26b-a4b", "gemma4-31b", "gemma4-12b", "gemma4-e2b",
-            "gemma4-e4b", "qwen3.6-27b", "magistral-small-24b"}
+            "gemma4-e4b", "qwen3.6-27b", "magistral-small-24b",
+            # phase-4 (2026-10-05): all three think by default under their templates
+            "muse-glimmer-30b", "qwen3.8-27b", "nemotron3.5-lightning-30b"}
 
 
 def eff(j, k):

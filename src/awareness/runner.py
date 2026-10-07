@@ -32,6 +32,8 @@ def _thinking_default(tokenizer) -> bool:
             [{"role": "user", "content": "x"}], add_generation_prompt=True, tokenize=False
         )
         tail = rendered[-80:].lower()
+        if 'valid recipients: "self"' in rendered.lower():  # Muse Glimmer reasoning channel
+            return True
         return any(kw in tail for kw in ("thought", "<think", "analysis", "channel"))
     except Exception:  # noqa: BLE001
         return False

@@ -10,7 +10,9 @@ Baseline (clean, no-swap) text is deduplicated per prompt (100 unique / model) t
 each page small. The trial list is paginated (the data is all embedded; only the nav is
 paged) so even 10,100 trials render smoothly.
 
-Usage: uv run python scripts/make_viewer.py [run_dir]
+Usage: uv run python scripts/make_viewer.py [run_dir ...]
+Several run dirs are merged into one site (e.g. sweep-v2 + a later phase); output goes to
+the first run dir unless VIEWER_OUT=<dir> is set.
 """
 from __future__ import annotations
 
@@ -19,7 +21,9 @@ import json
 import os
 import sys
 
-RUN = sys.argv[1] if len(sys.argv) > 1 else "results/runs/sweep-v2"
+RUNS = sys.argv[1:] or ["results/runs/sweep-v2"]
+RUN = RUNS[0]
+OUT = os.environ.get("VIEWER_OUT", RUN)
 EXPECTED = 10100
 LABELS = ("ignored", "corrected", "flagged", "derailed")
 
@@ -102,7 +106,10 @@ const esc = s => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const hiTrig = s => esc(s).replace(/\b(the)\b/gi,'<mark class="trig">$1</mark>');
 const hiSwap = (s,rep)=>{const r=rep.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   return esc(s).replace(new RegExp('\\b('+r+')\\b','gi'),'<mark class="swap">$1</mark>');};
-function segment(s){const c=s.match(/<\/think\s*>/i);
+function segment(s){const m=s.match(/^\s*to=self\s*<\|message\|>/);
+  if(m){const e=s.indexOf('<|eom|>',m[0].length); if(e<0)return{thought:s.slice(m[0].length),rest:''};
+    return{thought:s.slice(m[0].length,e),rest:s.slice(e+7).replace(/^\s*<\|start\|>assistant\s+to=user\s*<\|message\|>/,'')};}
+  const c=s.match(/<\/think\s*>/i);
   if(c){let t=s.slice(0,c.index).replace(/^\s*<think\b[^>]*>/i,'');return{thought:t,rest:s.slice(c.index+c[0].length)};}
   const o=s.match(/^\s*<think\b[^>]*>/i); if(o)return{thought:s.slice(o[0].length),rest:''}; return null;}
 function renderTxt(s,hi){const g=segment(s); if(!g)return hi(s);
@@ -179,7 +186,9 @@ def model_page(model, data):
     head = (f'<title>{model} — Sleight of Word</title>{CSS}'
             f'<header><h1>{model}</h1><span class="sub"><a href="index.html">&larr; all models</a> '
             f'&middot; baseline vs. word-swapped &middot; all trials</span>'
-            f'<span class="mstats">{statline}</span></header>'
+            f'<span class="mstats">{statline}</span>'
+            + (f'<span class="mstats" style="font-style:italic">* {MODEL_NOTES[model]}</span>'
+               if model in MODEL_NOTES else '') + '</header>'
             f'<div class="controls">{chip_html}</div>{LEGEND}'
             '<main><nav>'
             '<div class="pager"><button class="pg" id="prev">&lsaquo; prev</button>'
@@ -192,6 +201,43 @@ def model_page(model, data):
             '<div class="txt" id="rx"></div></div></div></section></main>')
     payload = {"model": model, "clean": data["clean"], "trials": data["trials"]}
     return head + PAGE_JS.replace("__DATA__", json.dumps(payload, separators=(",", ":")))
+
+
+# Per-model caveats: shown as a hoverable asterisk next to the name on the index, as a
+# footnote under the table, and on the model's own page.
+MODEL_NOTES = {
+    # Models whose chat template inserts its own system block (date and/or reasoning level)
+    # when no system prompt is given. Kept as-is: every model runs under its default template.
+    "muse-glimmer-30b": (
+        "Runs with the default system block its own chat template inserts when no system "
+        "prompt is given (identity line, knowledge cutoff, the current date, \u201cReasoning "
+        "strength: high\u201d, and its self/user recipient declaration). It is kept because "
+        "the model\u2019s reasoning channel (to=self) depends on it."),
+    "gpt-oss-20b": (
+        "Runs with the default system block its own chat template inserts when no system "
+        "prompt is given (identity line, knowledge cutoff, the current date, "
+        "\u201cReasoning: medium\u201d, and its channel declaration)."),
+    "qwen3.8-27b": (
+        "Runs with the default system block its own chat template inserts when no system "
+        "prompt is given (\u201cReasoning effort is set to xhigh\u201d plus a short "
+        "instruction to think carefully)."),
+}
+
+
+# Site-wide notes, listed (unstarred) before the per-model notes under the index table.
+GENERAL_NOTES = [
+    ("Engine",
+     "The 19 models of the paper ran on vLLM 0.23. The three models added in October 2026 "
+     "(qwen3.8-27b, muse-glimmer-30b, nemotron3.5-lightning-30b) ran on vLLM 0.31 with FP8 "
+     "checkpoints, judged by the same three-judge panel. A control rerun of llama3.3-70b-awq "
+     "on vLLM 0.31 reproduced 371 of 374 published replies character-for-character, with "
+     "matching judge labels and \u0394surprisal."),
+    ("Reasoning",
+     "The three October 2026 models think by default and usually restate the user\u2019s "
+     "question at the start of their reasoning, where the first swap then lands. Most of "
+     "their flagging happens inside the reasoning trace and typically attributes the odd "
+     "word to the user\u2019s question rather than to their own output."),
+]
 
 
 INDEX_LEGEND = [
@@ -212,7 +258,7 @@ def index_page(summaries, run):
     for m, s in summaries.items():
         n = s["jn"] or 1
         p = lambda k: round(100 * s["lab"].get(k, 0) / n)
-        data.append({"m": m, "flagged": p("flagged"), "ignored": p("ignored"),
+        data.append({"m": m, "note": MODEL_NOTES.get(m, ""), "flagged": p("flagged"), "ignored": p("ignored"),
                      "derailed": p("derailed"), "corrected": p("corrected"),
                      "aware": round(100*s["aware"]/n, 1), "think": round(100*s["think"]/s["n"]),
                      "swaps": s["subs"], "untouched": round(100*s["untouched"]/s["n"], 1)})
@@ -221,17 +267,25 @@ def index_page(summaries, run):
             ("aware", "Switch aware", "num"), ("think", "Think", "num"),
             ("swaps", "Swaps", "num"), ("untouched", "Untouched", "num")]
     legend = "".join(f'<div class="ldef"><b>{k}</b> — {v}</div>' for k, v in INDEX_LEGEND)
+    phase4 = {"qwen3.8-27b", "muse-glimmer-30b", "nemotron3.5-lightning-30b"}
+    notes = ("".join(f'<div class="ldef"><b>{k}</b> — {v}</div>' for k, v in GENERAL_NOTES)
+             if phase4 & set(summaries) else "")
+    notes += "".join(f'<div class="ldef"><b>{m}*</b> — {MODEL_NOTES[m]}</div>'
+                     for m in summaries if m in MODEL_NOTES)
     return (f'<title>Sleight of Word — {run}</title>{CSS}'
             '<style>.idx-t th.sortable{cursor:pointer;user-select:none;white-space:nowrap}'
             '.idx-t th.sortable:hover{color:var(--ink)}.arrow{opacity:.35;font-size:10px;margin-left:3px}'
             'th.sorted .arrow{opacity:1;color:var(--blue)}'
             '.ldef{font-size:12px;line-height:1.5;color:var(--muted);margin:2px 0}'
             '.ldef b{color:var(--ink);font-weight:600;display:inline-block;min-width:96px}'
+            'sup.note{color:var(--blue);cursor:help;font-weight:600;margin-left:2px}'
             '.legbox{margin-top:18px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:6px}</style>'
             f'<header><h1>Sleight of Word</h1><span class="sub">{run} &middot; '
             f'{len(summaries)} models &middot; click a model for all its trials &middot; click a column to sort</span></header>'
             '<div class="idx"><table class="idx-t"><thead><tr id="hrow"></tr></thead>'
             '<tbody id="tb"></tbody></table>'
+            + (f'<div class="legbox"><div class="ldef" style="margin-bottom:6px"><b style="min-width:0">'
+               f'Notes</b></div>{notes}</div>' if notes else '') +
             f'<div class="legbox"><div class="ldef" style="margin-bottom:6px"><b style="min-width:0">Columns</b></div>{legend}'
             '<div class="ldef" style="margin-top:8px;font-style:italic">Judge labels come from a jury of '
             'three LLM judges from distinct lineages; a label is assigned when at least two jurors agree. '
@@ -245,13 +299,15 @@ def index_page(summaries, run):
             "  return `<th class=\"sortable${c[0]==='m'?' m':''}${on?' sorted':''}\" data-k=\"${c[0]}\">${c[1]}<span class=\"arrow\">${ar}</span></th>`;}).join('');\n"
             " hr.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sk)sd=-sd;else{sk=k;sd=(k==='m'?1:-1);}draw();});\n"
             " const rs=[...ROWS].sort((a,b)=>{let x=a[sk],y=b[sk];if(sk==='m')return sd*x.localeCompare(y);return sd*(x-y);});\n"
-            " const fmt=(k,v)=>k==='m'?`<a href=\"viewer-${v}.html\">${v}</a>`:(k==='swaps'?v.toLocaleString():v+'%');\n"
-            " document.getElementById('tb').innerHTML=rs.map(r=>'<tr>'+COLS.map(c=>`<td class=\"${c[0]==='m'?'m':''}\">${fmt(c[0],r[c[0]])}</td>`).join('')+'</tr>').join('');\n"
+            " const esc=s=>s.replace(/&/g,'&amp;').replace(/\"/g,'&quot;').replace(/</g,'&lt;');\n"
+            " const fmt=(k,v,r)=>k==='m'?`<a href=\"viewer-${v}.html\">${v}</a>`+(r.note?`<sup class=\"note\" title=\"${esc(r.note)}\">*</sup>`:''):(k==='swaps'?v.toLocaleString():v+'%');\n"
+            " document.getElementById('tb').innerHTML=rs.map(r=>'<tr>'+COLS.map(c=>`<td class=\"${c[0]==='m'?'m':''}\">${fmt(c[0],r[c[0]],r)}</td>`).join('')+'</tr>').join('');\n"
             "}\ndraw();\n</script>")
 
 
 def main():
-    files = sorted(glob.glob(os.path.join(RUN, "*.judged.jsonl")))
+    files = sorted(f for r in RUNS for f in glob.glob(os.path.join(r, "*.judged.jsonl")))
+    os.makedirs(OUT, exist_ok=True)
     summaries = {}
     for f in files:
         m = os.path.basename(f)[:-len(".judged.jsonl")]
@@ -303,12 +359,13 @@ def main():
                     stats["lab"]["ignored"] = stats["lab"].get("ignored", 0) + 1
                 if jm & 8:
                     stats["aware"] += 1
-        out = os.path.join(RUN, f"viewer-{m}.html")
+        out = os.path.join(OUT, f"viewer-{m}.html")
         open(out, "w", encoding="utf-8").write(model_page(m, {"clean": clean, "trials": trials, "stats": stats}))
         summaries[m] = stats
         print(f"  {m}: {len(trials):,} trials -> {os.path.getsize(out)//1024//1024} MB")
-    idx = os.path.join(RUN, "index.html")
-    open(idx, "w", encoding="utf-8").write(index_page(summaries, os.path.basename(RUN.rstrip("/"))))
+    idx = os.path.join(OUT, "index.html")
+    label = " + ".join(os.path.basename(r.rstrip("/")) for r in RUNS)
+    open(idx, "w", encoding="utf-8").write(index_page(summaries, label))
     print(f"\nwrote {idx} ({len(summaries)} models)")
     print(f"open it:  file://{os.path.abspath(idx)}")
 

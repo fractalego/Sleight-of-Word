@@ -21,6 +21,9 @@ _MARKERS = {
     "think_tag": re.compile(r"</?think\b", re.IGNORECASE),
     "channel": re.compile(r"[<|]\s*channel|channel\s*[|>]|<\|?(?:thought|analysis|final)\|?>", re.IGNORECASE),
     "analysis_channel": re.compile(r"\b(?:analysis|thought) channel\b", re.IGNORECASE),
+    # Muse Glimmer reasons in a recipient-addressed channel: ' to=self<|message|>...<|eom|>'
+    # before answering in '<|start|>assistant to=user<|message|>' (added 2026-10-05).
+    "self_channel": re.compile(r"\bto=self\s*<\|message\|>"),
 }
 
 _OPENER = re.compile(
